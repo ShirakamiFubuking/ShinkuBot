@@ -18,11 +18,13 @@ fun main(args: Array<String>) {
 
     // 紀錄每個人上次說晚安時間的Map
     val list = HashMap<Int, Int>()
-    val nameMap = try {
-        val f = File(USERNAME_FILE)
-        Gson().fromJson(f.readText(Charset.forName("UTF-8")), HashMap<Int, String>().javaClass)
-    } catch (e: Exception) {
-        HashMap()
+    val nameMap = run {
+        try {
+            val f = File(USERNAME_FILE)
+            return@run Gson().fromJson(f.readText(Charset.forName("UTF-8")), HashMap<Int, String>().javaClass)
+        } catch (e: Exception) {
+        }
+        return@run HashMap<Int, String>()
     }
     bot.addInterest(TdApi.UpdateNewMessage.CONSTRUCTOR) {
         val newMessage = it as TdApi.UpdateNewMessage
