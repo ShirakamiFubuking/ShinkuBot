@@ -1,0 +1,10 @@
+FROM ubuntu
+MAINTAINER Fubuking
+
+RUN apt-get -y update && apt-get -y upgrade && \
+    apt-get -y install libc++-dev default-jre && \
+    apt-get clean
+
+ADD ShinkuBot.tar.gz /
+
+CMD java -Djava.library.path=. -jar ShinkuBot.jar $API_ID $API_HASH $TOKEN
