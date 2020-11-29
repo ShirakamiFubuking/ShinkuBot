@@ -21,10 +21,10 @@ fun main(args: Array<String>) {
     val nameMap = run {
         try {
             val f = File(USERNAME_FILE)
-            return@run Gson().fromJson(f.readText(Charset.forName("UTF-8")), HashMap<Int, String>().javaClass)
+            return@run Gson().fromJson(f.readText(Charset.forName("UTF-8")), HashMap<String, String>().javaClass)
         } catch (e: Exception) {
         }
-        return@run HashMap<Int, String>()
+        return@run HashMap<String, String>()
     }
     bot.addInterest(TdApi.UpdateNewMessage.CONSTRUCTOR) {
         val newMessage = it as TdApi.UpdateNewMessage
@@ -40,8 +40,8 @@ fun main(args: Array<String>) {
                     bot.client.send(TdApi.GetUser(senderId)) { usr ->
                         val user = usr as TdApi.User
                         var userName = user.firstName + user.lastName
-                        nameMap[senderId]?.let {
-                            userName = nameMap[senderId]!!
+                        nameMap[senderId.toString()]?.let {
+                            userName = nameMap[senderId.toString()]!!
                         }
                         if (lastDate == nowDate) {
                             val content: TdApi.InputMessageContent = TdApi.InputMessageText(TdApi.FormattedText("請快去睡覺", null), false, true)
@@ -76,7 +76,7 @@ fun main(args: Array<String>) {
                                 bot.client.send(TdApi.SendMessage(newMessage.message.chatId, 0, newMessage.message.id, null, null, content)) {
                                 }
                             } else {
-                                nameMap[senderId] = arg.toString()
+                                nameMap[senderId.toString()] = arg.toString()
                                 val content: TdApi.InputMessageContent = TdApi.InputMessageText(TdApi.FormattedText("OK", null), false, true)
                                 bot.client.send(TdApi.SendMessage(newMessage.message.chatId, 0, newMessage.message.id, null, null, content)) {
                                 }
