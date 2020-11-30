@@ -9,15 +9,25 @@ import java.util.concurrent.locks.ReentrantLock
 /**
  * Example class for TDLib usage from Java.
  */
-class Bot constructor(val api_id: Int, val api_hash: String, val phoneNumber: String, val password: String) {
+fun printErr(string: Any) {
+    System.err.print(string)
+}
+
+fun printlnErr(string: Any) {
+    System.err.println(string)
+}
+
+val newLine: String = System.getProperty("line.separator")
+
+class Bot constructor(private val api_id: Int, private val api_hash: String, private val phoneNumber: String, private val password: String) {
     lateinit var client: Client
-    private var authorizationState: AuthorizationState? = null
-    private val newLine = System.getProperty("line.separator")
-    private val authorizationLock: Lock = ReentrantLock()
+    lateinit var me: User
+    private lateinit var authorizationState: AuthorizationState
+    private val authorizationLock = ReentrantLock()
     private val gotAuthorization = authorizationLock.newCondition()
 
     // 感興趣的handler清單
-    val handlerList = mutableListOf<Interest>()
+    private val handlerList = mutableListOf<Interest>()
 
     @Volatile
     private var haveAuthorization = false
@@ -31,12 +41,12 @@ class Bot constructor(val api_id: Int, val api_hash: String, val phoneNumber: St
     private val authorizationRequestHandler = Client.ResultHandler {
         when (it.constructor) {
             Error.CONSTRUCTOR -> {
-                System.err.println("Receive an error:$newLine$it")
+                println("Receive an error:$newLine$it")
                 onAuthorizationStateUpdated(null) // repeat last action
             }
             Ok.CONSTRUCTOR -> {
             }
-            else -> System.err.println("Receive wrong response from TDLib:$newLine$it")
+            else -> printlnErr("Receive wrong response from TDLib:$newLine$it")
         }
     }
 
@@ -62,11 +72,11 @@ class Bot constructor(val api_id: Int, val api_hash: String, val phoneNumber: St
         handlerList.add(Interest(updateConstructor, handler))
     }
 
-    // 處理感興趣的update
     private val updateHandler = Client.ResultHandler {
         when (it.constructor) {
             UpdateAuthorizationState.CONSTRUCTOR -> onAuthorizationStateUpdated((it as UpdateAuthorizationState).authorizationState)
             else -> {
+                // 處理感興趣的update
                 for (inst in handlerList) {
                     when (it.constructor) {
                         inst.updatesConstructor -> inst.handler.onResult(it)
@@ -85,22 +95,28 @@ class Bot constructor(val api_id: Int, val api_hash: String, val phoneNumber: St
         client = Client.create(updateHandler, null, null)
     }
 
+    fun isClosed(): Boolean {
+        return canQuit
+    }
+
     private fun onAuthorizationStateUpdated(authorizationState: AuthorizationState?) {
-        if (authorizationState != null) {
-            this.authorizationState = authorizationState
+        authorizationState?.let {
+            this.authorizationState = it
         }
         when (authorizationState?.constructor) {
             AuthorizationStateWaitTdlibParameters.CONSTRUCTOR -> {
                 val parameters = TdlibParameters()
-                parameters.databaseDirectory = "tdlib"
-                parameters.useMessageDatabase = true
-                parameters.useSecretChats = true
-                parameters.apiId = api_id
-                parameters.apiHash = api_hash
-                parameters.systemLanguageCode = "en"
-                parameters.deviceModel = "Desktop"
-                parameters.applicationVersion = "1.0"
-                parameters.enableStorageOptimizer = true
+                with(parameters) {
+                    databaseDirectory = "tdlib"
+                    useMessageDatabase = true
+                    useSecretChats = true
+                    apiId = api_id
+                    apiHash = api_hash
+                    systemLanguageCode = "en"
+                    deviceModel = "Desktop"
+                    applicationVersion = "1.0"
+                    enableStorageOptimizer = true
+                }
                 client.send(SetTdlibParameters(parameters), authorizationRequestHandler)
             }
             AuthorizationStateWaitEncryptionKey.CONSTRUCTOR -> client.send(CheckDatabaseEncryptionKey(), authorizationRequestHandler)
@@ -152,7 +168,7 @@ class Bot constructor(val api_id: Int, val api_hash: String, val phoneNumber: St
                     canQuit = true
                 }
             }
-            else -> System.err.println("Unsupported authorization state:$newLine$authorizationState")
+            else -> printlnErr("Unsupported authorization state:$newLine$authorizationState")
         }
     }
 }

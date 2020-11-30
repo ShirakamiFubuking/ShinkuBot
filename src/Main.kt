@@ -5,6 +5,7 @@ import java.nio.charset.Charset
 import java.util.*
 import kotlin.collections.HashMap
 
+val gson = Gson()
 fun main(args: Array<String>) {
     // 載入外部函式庫tdjni
     try {
@@ -21,7 +22,7 @@ fun main(args: Array<String>) {
     val nameMap = run {
         try {
             val f = File(USERNAME_FILE)
-            return@run Gson().fromJson(f.readText(Charset.forName("UTF-8")), HashMap<String, String>().javaClass)
+            return@run gson.fromJson(f.readText(Charset.forName("UTF-8")), HashMap<String, String>().javaClass)
         } catch (e: Exception) {
         }
         return@run HashMap<String, String>()
@@ -84,7 +85,7 @@ fun main(args: Array<String>) {
                                 if (!f.exists()) {
                                     f.createNewFile()
                                 }
-                                f.writeText(Gson().toJson(nameMap), Charset.forName("utf-8"))
+                                f.writeText(gson.toJson(nameMap), Charset.forName("utf-8"))
                             }
                         }
                     }
@@ -93,7 +94,7 @@ fun main(args: Array<String>) {
         }
     })
     bot.start()
-    while (true){
-        Thread.sleep(1000000000000000000)
+    while (!bot.isClosed()){
+        Thread.sleep(1000)
     }
 }
