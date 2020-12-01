@@ -14,7 +14,7 @@ fun main(args: Array<String>) {
         e.printStackTrace()
     }
 
-    val bot = Bot(args[0].toInt(),args[1],args[2], "")
+    val bot = Bot(args[0].toInt(), args[1], args[2], "")
     val matchGoodNight = Regex("""(?:晚安)""")
 
     // 紀錄每個人上次說晚安時間的Map
@@ -59,42 +59,29 @@ fun main(args: Array<String>) {
             }
         }
     }
-
     // 註冊bot指令
-    bot.addInterest(Interest(TdApi.UpdateNewMessage.CONSTRUCTOR) {
-        val newMessage = it as TdApi.UpdateNewMessage
-        if (newMessage.message.content.constructor == TdApi.MessageText.CONSTRUCTOR) {
-            val msgText = newMessage.message.content as TdApi.MessageText
-            for (i in msgText.text.entities) {
-                if (i.type.constructor == TdApi.TextEntityTypeBotCommand.CONSTRUCTOR) {
-                    val cmd = msgText.text.text.subSequence(0, i.length)
-                    val arg = msgText.text.text.subSequence(i.length, msgText.text.text.length).trim()
-                    val senderId = (newMessage.message.sender as TdApi.MessageSenderUser).userId
-                    when (cmd) {
-                        "/myname" -> {
-                            if (arg.isEmpty()) {
-                                val content: TdApi.InputMessageContent = TdApi.InputMessageText(TdApi.FormattedText("不明白", null), false, true)
-                                bot.client.send(TdApi.SendMessage(newMessage.message.chatId, 0, newMessage.message.id, null, null, content)) {
-                                }
-                            } else {
-                                nameMap[senderId.toString()] = arg.toString()
-                                val content: TdApi.InputMessageContent = TdApi.InputMessageText(TdApi.FormattedText("OK", null), false, true)
-                                bot.client.send(TdApi.SendMessage(newMessage.message.chatId, 0, newMessage.message.id, null, null, content)) {
-                                }
-                                val f = File("user.json")
-                                if (!f.exists()) {
-                                    f.createNewFile()
-                                }
-                                f.writeText(gson.toJson(nameMap), Charset.forName("utf-8"))
-                            }
-                        }
+    bot.addCommandListener(object : CommandListener {
+        override fun onCommand(chatId: Long, senderId: Int, msgId: Long, command: String, arg: String) {
+            if (command == "/myname") {
+                var content: TdApi.InputMessageContent
+                if (arg.isEmpty()) {
+                    content = TdApi.InputMessageText(TdApi.FormattedText("不明白", null), false, true)
+                } else {
+                    nameMap[senderId.toString()] = arg
+                    content = TdApi.InputMessageText(TdApi.FormattedText("OK", null), false, true)
+                    bot.client.send(TdApi.SendMessage(chatId, 0, msgId, null, null, content), null)
+                    val f = File("user.json")
+                    if (!f.exists()) {
+                        f.createNewFile()
                     }
+                    f.writeText(gson.toJson(nameMap), Charset.forName("utf-8"))
                 }
+                bot.client.send(TdApi.SendMessage(chatId, 0, msgId, null, null, content), null)
             }
         }
     })
     bot.start()
-    while (!bot.isClosed()){
+    while (!bot.isClosed()) {
         Thread.sleep(1000)
     }
 }

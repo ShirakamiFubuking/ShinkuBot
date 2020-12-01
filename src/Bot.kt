@@ -1,4 +1,5 @@
 import org.drinkless.tdlib.Client
+import org.drinkless.tdlib.Client.ResultHandler
 import org.drinkless.tdlib.TdApi.*
 import java.io.BufferedReader
 import java.io.IOException
@@ -9,6 +10,7 @@ import java.util.concurrent.locks.ReentrantLock
 /**
  * Example class for TDLib usage from Java.
  */
+
 fun printErr(string: Any) {
     System.err.print(string)
 }
@@ -25,6 +27,7 @@ class Bot constructor(private val api_id: Int, private val api_hash: String, pri
     private lateinit var authorizationState: AuthorizationState
     private val authorizationLock = ReentrantLock()
     private val gotAuthorization = authorizationLock.newCondition()
+    private val commandList = mutableListOf<CommandListener>()
 
     // 感興趣的handler清單
     private val handlerList = mutableListOf<Interest>()
@@ -38,7 +41,7 @@ class Bot constructor(private val api_id: Int, private val api_hash: String, pri
     @Volatile
     private var canQuit = false
 
-    private val authorizationRequestHandler = Client.ResultHandler {
+    private val authorizationRequestHandler = ResultHandler {
         when (it.constructor) {
             Error.CONSTRUCTOR -> {
                 println("Receive an error:$newLine$it")
@@ -62,25 +65,77 @@ class Bot constructor(private val api_id: Int, private val api_hash: String, pri
     }
 
     /**
+     * 註冊指令
+     * @param commandListener
+     */
+    fun addCommandListener(commandListener: CommandListener) {
+        commandList.add(commandListener)
+    }
+
+    /**
      * 註冊感興趣的handler
      */
     fun addInterest(interest: Interest) {
         handlerList.add(interest)
     }
 
-    fun addInterest(updateConstructor: Int, handler: Client.ResultHandler) {
+    fun addInterest(updateConstructor: Int, handler: ResultHandler) {
         handlerList.add(Interest(updateConstructor, handler))
     }
 
-    private val updateHandler = Client.ResultHandler {
+    private val updateHandler = ResultHandler {
         when (it.constructor) {
             UpdateAuthorizationState.CONSTRUCTOR -> onAuthorizationStateUpdated((it as UpdateAuthorizationState).authorizationState)
-            else -> {
-                // 處理感興趣的update
-                for (inst in handlerList) {
-                    when (it.constructor) {
-                        inst.updatesConstructor -> inst.handler.onResult(it)
+            UpdateNewMessage.CONSTRUCTOR -> {
+                val obj = it as UpdateNewMessage
+                val msgContent = obj.message.content
+                val chatId = obj.message.chatId
+                val senderId = obj.message.sender.let {
+                    if (obj.message.sender.constructor == MessageSenderUser.CONSTRUCTOR) {
+                        return@let (obj.message.sender as MessageSenderUser).userId
+                    } else {
+                        return@let 0
                     }
+                }
+                val msgId = obj.message.id
+                when (msgContent.constructor) {
+                    MessageText.CONSTRUCTOR -> {
+                        val text = msgContent.let { mc ->
+                            (mc as MessageText).text.text
+                        }
+                        val entities = msgContent.let { mc ->
+                            (mc as MessageText).text.entities
+                        }
+                        var cmd = ""
+                        var arg = ""
+                        val isCmd = msgContent.let {
+                            var b = false
+                            entities.forEach { te ->
+                                if (te.type.constructor == TextEntityTypeBotCommand.CONSTRUCTOR) {
+                                    b = true
+                                    cmd = text.subSequence(te.offset, te.length).toString()
+                                    arg = text.subSequence(te.length, text.length).trim().toString()
+                                    return@forEach
+                                }
+                            }
+                            b
+                        }
+                        if (isCmd) {
+                            // 處理命令
+                            commandList.forEach { l ->
+                                l.onCommand(chatId, senderId, msgId, cmd, arg)
+                            }
+                        }
+                    }
+                }
+                for (inst in handlerList) when (UpdateNewMessage.CONSTRUCTOR) {
+                    inst.updatesConstructor -> inst.handler.onResult(it)
+                }
+            }
+            else -> {
+                // 處理其他感興趣的update
+                for (inst in handlerList) when (it.constructor) {
+                    inst.updatesConstructor -> inst.handler.onResult(it)
                 }
             }
         }
@@ -95,11 +150,13 @@ class Bot constructor(private val api_id: Int, private val api_hash: String, pri
         client = Client.create(updateHandler, null, null)
     }
 
-    fun isClosed(): Boolean {
+    fun isClosed()
+            : Boolean {
         return canQuit
     }
 
-    private fun onAuthorizationStateUpdated(authorizationState: AuthorizationState?) {
+    private fun onAuthorizationStateUpdated(authorizationState: AuthorizationState?
+    ) {
         authorizationState?.let {
             this.authorizationState = it
         }
