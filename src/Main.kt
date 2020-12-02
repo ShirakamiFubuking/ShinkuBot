@@ -1,8 +1,8 @@
 import com.google.gson.Gson
-import org.drinkless.tdlib.TdApi
+import org.drinkless.tdlib.TdApi.*
 import java.io.File
 import java.nio.charset.Charset
-import java.util.*
+import java.util.Date
 import kotlin.collections.HashMap
 
 val gson = Gson()
@@ -27,33 +27,32 @@ fun main(args: Array<String>) {
         }
         return@run HashMap<String, String>()
     }
-    // 註冊bot指令
     with(bot) {
-        addInterest(TdApi.UpdateNewMessage.CONSTRUCTOR) {
-            val newMessage = it as TdApi.UpdateNewMessage
-            if (newMessage.message.content.constructor == TdApi.MessageText.CONSTRUCTOR) {
-                val msgText = newMessage.message.content as TdApi.MessageText
+        addInterest(UpdateNewMessage.CONSTRUCTOR) {
+            val newMessage = it as UpdateNewMessage
+            if (newMessage.message.content.constructor == MessageText.CONSTRUCTOR) {
+                val msgText = newMessage.message.content as MessageText
                 if (matchGoodNight.containsMatchIn(msgText.text.text)) {
-                    if (newMessage.message.sender.constructor == TdApi.MessageSenderUser.CONSTRUCTOR) {
-                        val senderId = (newMessage.message.sender as TdApi.MessageSenderUser).userId
+                    if (newMessage.message.sender.constructor == MessageSenderUser.CONSTRUCTOR) {
+                        val senderId = (newMessage.message.sender as MessageSenderUser).userId
                         val lastDate = list[senderId]
                         val nowDate = Date(System.currentTimeMillis()).date
                         val chatId = newMessage.message.chatId
                         val msgId = newMessage.message.id
-                        client.send(TdApi.GetUser(senderId)) { usr ->
-                            val user = usr as TdApi.User
+                        client.send(GetUser(senderId)) { usr ->
+                            val user = usr as User
                             var userName = user.firstName + user.lastName
                             nameMap[senderId.toString()]?.let {
                                 userName = nameMap[senderId.toString()]!!
                             }
-                            var content: TdApi.InputMessageContent
+                            var content: InputMessageContent
                             if (lastDate == nowDate) {
-                                content = TdApi.InputMessageText(TdApi.FormattedText("請快去睡覺", null), false, true)
+                                content = InputMessageText(FormattedText("請快去睡覺", null), false, true)
                             } else {
-                                content = TdApi.InputMessageText(TdApi.FormattedText("願明天對$userName" + "來說也是美好的一天", null), false, true)
+                                content = InputMessageText(FormattedText("願明天對${userName}來說也是美好的一天", null), false, true)
                                 list[senderId] = nowDate
                             }
-                            client.send(TdApi.SendMessage(chatId, 0, msgId, null, null, content), null)
+                            client.send(SendMessage(chatId, 0, msgId, null, null, content), null)
                         }
                     }
                 }
@@ -63,20 +62,19 @@ fun main(args: Array<String>) {
         addCommandListener(object : CommandListener {
             override fun onCommand(chatId: Long, senderId: Int, msgId: Long, command: String, arg: String) {
                 if (command == "/myname") {
-                    var content: TdApi.InputMessageContent
+                    var content: InputMessageContent
                     if (arg.isEmpty()) {
-                        content = TdApi.InputMessageText(TdApi.FormattedText("不明白", null), false, true)
+                        content = InputMessageText(FormattedText("不明白", null), false, true)
                     } else {
                         nameMap[senderId.toString()] = arg
-                        content = TdApi.InputMessageText(TdApi.FormattedText("OK", null), false, true)
-                        client.send(TdApi.SendMessage(chatId, 0, msgId, null, null, content), null)
-                        val f = File("user.json")
+                        content = InputMessageText(FormattedText("OK", null), false, true)
+                        val f = File(USERNAME_FILE)
                         if (!f.exists()) {
                             f.createNewFile()
                         }
                         f.writeText(gson.toJson(nameMap), Charset.forName("utf-8"))
                     }
-                    client.send(TdApi.SendMessage(chatId, 0, msgId, null, null, content), null)
+                    client.send(SendMessage(chatId, 0, msgId, null, null, content), null)
                 }
             }
         })

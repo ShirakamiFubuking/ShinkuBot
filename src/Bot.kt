@@ -122,8 +122,16 @@ class Bot constructor(private val api_id: Int, private val api_hash: String, pri
                         }
                         if (isCmd) {
                             // 處理命令
-                            commandList.forEach { l ->
-                                l.onCommand(chatId, senderId, msgId, cmd, arg)
+                            val at = cmd.split("@").let {
+                                if (it.size==2){
+                                    return@let it[1]
+                                }
+                                return@let ""
+                            }
+                            if (at == me.username || at == ""){
+                                commandList.forEach { l ->
+                                    l.onCommand(chatId, senderId, msgId, cmd, arg)
+                                }
                             }
                         }
                     }
@@ -134,29 +142,36 @@ class Bot constructor(private val api_id: Int, private val api_hash: String, pri
             }
             else -> {
                 // 處理其他感興趣的update
-                for (inst in handlerList) when (it.constructor) {
-                    inst.updatesConstructor -> inst.handler.onResult(it)
-                }
+//                for (inst in handlerList) when (it.constructor) {
+//                    inst.updatesConstructor -> inst.handler.onResult(it)
+//                }
             }
         }
     }
 
     fun start() {
-        Client.execute(SetLogVerbosityLevel(0))
-        if (Client.execute(SetLogStream(LogStreamFile("tdlib.log", 1 shl 8, false))) is Error) {
+        Client.execute(SetLogVerbosityLevel(5))
+        if (Client.execute(SetLogStream(LogStreamFile("tdlib.log", 1 shl 27, false))) is Error) {
             throw Error("Write access to the current directory is required")
         }
         // create client
         client = Client.create(updateHandler, null, null)
+        authorizationLock.lock()
+        try {
+            while (!haveAuthorization) {
+                gotAuthorization.await()
+            }
+            print("login: ${me.firstName+me.lastName}")
+        } finally {
+            authorizationLock.unlock()
+        }
     }
 
-    fun isClosed()
-            : Boolean {
+    fun isClosed(): Boolean {
         return canQuit
     }
 
-    private fun onAuthorizationStateUpdated(authorizationState: AuthorizationState?
-    ) {
+    private fun onAuthorizationStateUpdated(authorizationState: AuthorizationState?) {
         authorizationState?.let {
             this.authorizationState = it
         }
@@ -201,12 +216,17 @@ class Bot constructor(private val api_id: Int, private val api_hash: String, pri
                 client.send(CheckAuthenticationPassword(password), authorizationRequestHandler)
             }
             AuthorizationStateReady.CONSTRUCTOR -> {
-                haveAuthorization = true
-                authorizationLock.lock()
-                try {
-                    gotAuthorization.signal()
-                } finally {
-                    authorizationLock.unlock()
+                client.send(GetMe()) {
+                    if (it.constructor == User.CONSTRUCTOR) {
+                        me = it as User
+                        authorizationLock.lock()
+                        haveAuthorization = true
+                        try {
+                            gotAuthorization.signal()
+                        } finally {
+                            authorizationLock.unlock()
+                        }
+                    }
                 }
             }
             AuthorizationStateLoggingOut.CONSTRUCTOR -> {
