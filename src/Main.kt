@@ -45,7 +45,7 @@ fun main(args: Array<String>) {
                             nameMap[senderId.toString()]?.let {
                                 userName = nameMap[senderId.toString()]!!
                             }
-                            var content: InputMessageContent
+                            val content: InputMessageContent
                             if (lastDate == nowDate) {
                                 content = InputMessageText(FormattedText("請快去睡覺", null), false, true)
                             } else {
@@ -62,7 +62,7 @@ fun main(args: Array<String>) {
         addCommandListener(object : CommandListener {
             override fun onCommand(chatId: Long, senderId: Int, msgId: Long, command: String, arg: String) {
                 if (command == "/myname") {
-                    var content: InputMessageContent
+                    val content: InputMessageContent
                     if (arg.isEmpty()) {
                         content = InputMessageText(FormattedText("不明白", null), false, true)
                     } else {
